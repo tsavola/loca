@@ -7,13 +7,13 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net"
 	"os"
 	"time"
 )
@@ -29,10 +29,12 @@ Initialize a certificate authority:
   %s -init [-cacert=file -cakey=file] [not-after]
 
 Generate a client certificate:
-  %s cert-file key-file common-name [not-after]
+  %s cert-file key-file subject usage [not-after]
 
 Do both at the same time:
-  %s -init [-cacert=file -cakey=file] cert-file key-file common-name [not-after]
+  %s -init [-cacert=file -cakey=file] cert-file key-file subject usage [not-after]
+
+Usage is "client" or "server".
 
 The not-after date is specified in YYYY-MM-DD format.
 
@@ -60,10 +62,11 @@ func main() {
 	flag.Parse()
 
 	var (
-		client   bool
+		gen      bool
 		cert     string
 		key      string
 		name     string
+		usage    string
 		notAfter string
 	)
 
@@ -73,25 +76,27 @@ func main() {
 	case 1:
 		notAfter = flag.Arg(0)
 
-	case 3:
-		client = true
-		cert = flag.Arg(0)
-		key = flag.Arg(1)
-		name = flag.Arg(2)
-
 	case 4:
-		client = true
+		gen = true
 		cert = flag.Arg(0)
 		key = flag.Arg(1)
 		name = flag.Arg(2)
-		notAfter = flag.Arg(3)
+		usage = flag.Arg(3)
+
+	case 5:
+		gen = true
+		cert = flag.Arg(0)
+		key = flag.Arg(1)
+		name = flag.Arg(2)
+		usage = flag.Arg(3)
+		notAfter = flag.Arg(4)
 
 	default:
 		flag.Usage()
 		os.Exit(2)
 	}
 
-	if !(ca || client) {
+	if !(ca || gen) {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -121,15 +126,29 @@ func main() {
 		}
 	}
 
-	if client {
-		if _, err := os.Stat(cert); err == nil {
-			log.Fatalf("Client certificate file already exists: %s", cert)
-		}
-		if _, err := os.Stat(key); err == nil {
-			log.Fatalf("Client private key file already exists: %s", key)
+	if gen {
+		var extUsage x509.ExtKeyUsage
+
+		switch usage {
+		case "client":
+			extUsage |= x509.ExtKeyUsageClientAuth
+
+		case "server":
+			extUsage |= x509.ExtKeyUsageServerAuth
+
+		default:
+			flag.Usage()
+			os.Exit(2)
 		}
 
-		if err := createClientCert(cert, key, name, caCert, caKey, t); err != nil {
+		if _, err := os.Stat(cert); err == nil {
+			log.Fatalf("Certificate file already exists: %s", cert)
+		}
+		if _, err := os.Stat(key); err == nil {
+			log.Fatalf("Private key file already exists: %s", key)
+		}
+
+		if err := createCert(cert, key, name, caCert, caKey, extUsage, t); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -174,7 +193,7 @@ func createCA(certFile, keyFile string, notAfter time.Time) error {
 	return nil
 }
 
-func createClientCert(certFile, keyFile, name, caCertFile, caKeyFile string, notAfter time.Time) error {
+func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, extUsage x509.ExtKeyUsage, notAfter time.Time) error {
 	caCertData, err := readPEM(caCertFile)
 	if err != nil {
 		return err
@@ -204,12 +223,16 @@ func createClientCert(certFile, keyFile, name, caCertFile, caKeyFile string, not
 
 	template := &x509.Certificate{
 		SerialNumber:          big.NewInt(time.Now().Unix()),
-		Subject:               pkix.Name{CommonName: name},
 		NotBefore:             truncateDate(time.Now()),
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{extUsage},
 		BasicConstraintsValid: true,
+	}
+	if ip := net.ParseIP(name); ip != nil {
+		template.IPAddresses = append(template.IPAddresses, ip)
+	} else {
+		template.DNSNames = append(template.DNSNames, name)
 	}
 
 	certData, err := x509.CreateCertificate(nil, template, caCert, pub, caKey)
