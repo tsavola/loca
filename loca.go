@@ -61,7 +61,7 @@ func main() {
 	flag.BoolVar(&ca, "init", ca, "generate CA certificate and private key")
 	flag.StringVar(&caCert, "cacert", caCert, "CA certificate filename")
 	flag.StringVar(&caKey, "cakey", caKey, "CA private key filename")
-	flag.BoolVar(&common, "commonname", common, "set CommonName instead of DNS/IP address")
+	flag.BoolVar(&common, "commonname", common, "set CommonName in addition to DNS/IP address")
 	flag.Parse()
 
 	var (
@@ -234,7 +234,8 @@ func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, common bo
 	}
 	if common {
 		template.Subject = pkix.Name{CommonName: name}
-	} else if ip := net.ParseIP(name); ip != nil {
+	}
+	if ip := net.ParseIP(name); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, name)
