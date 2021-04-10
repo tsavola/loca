@@ -7,6 +7,7 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -29,10 +30,10 @@ Initialize a certificate authority:
   %s -init [-cacert=file -cakey=file] [not-after]
 
 Generate a client certificate:
-  %s cert-file key-file subject usage [not-after]
+  %s [-commonname] cert-file key-file name usage [not-after]
 
 Do both at the same time:
-  %s -init [-cacert=file -cakey=file] cert-file key-file subject usage [not-after]
+  %s -init [-cacert=file -cakey=file] [-commonname] cert-file key-file name usage [not-after]
 
 Usage is "client" or "server".
 
@@ -54,11 +55,13 @@ func main() {
 		ca     bool
 		caCert = "cacert.pem"
 		caKey  = "cakey.pem"
+		common bool
 	)
 
 	flag.BoolVar(&ca, "init", ca, "generate CA certificate and private key")
 	flag.StringVar(&caCert, "cacert", caCert, "CA certificate filename")
 	flag.StringVar(&caKey, "cakey", caKey, "CA private key filename")
+	flag.BoolVar(&common, "commonname", common, "set CommonName instead of DNS/IP address")
 	flag.Parse()
 
 	var (
@@ -148,7 +151,7 @@ func main() {
 			log.Fatalf("Private key file already exists: %s", key)
 		}
 
-		if err := createCert(cert, key, name, caCert, caKey, extUsage, t); err != nil {
+		if err := createCert(cert, key, name, caCert, caKey, common, extUsage, t); err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -193,7 +196,7 @@ func createCA(certFile, keyFile string, notAfter time.Time) error {
 	return nil
 }
 
-func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, extUsage x509.ExtKeyUsage, notAfter time.Time) error {
+func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, common bool, extUsage x509.ExtKeyUsage, notAfter time.Time) error {
 	caCertData, err := readPEM(caCertFile)
 	if err != nil {
 		return err
@@ -229,7 +232,9 @@ func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, extUsage 
 		ExtKeyUsage:           []x509.ExtKeyUsage{extUsage},
 		BasicConstraintsValid: true,
 	}
-	if ip := net.ParseIP(name); ip != nil {
+	if common {
+		template.Subject = pkix.Name{CommonName: name}
+	} else if ip := net.ParseIP(name); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, name)
