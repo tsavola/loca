@@ -24,7 +24,7 @@ const (
 	defaultAge = time.Hour * 123456
 )
 
-const usage = `Very simple Ed25519 client and server certificate creation utility.
+const usage = `Simple Ed25519 client and server certificate creation utility for local usage.
 
 Initialize a certificate authority:
   %s -init [-cacert=file -cakey=file] [not-after]
