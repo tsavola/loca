@@ -24,12 +24,12 @@ const (
 	defaultAge = time.Hour * 123456
 )
 
-const usage = `Very simple Ed25519 client certificate creation utility.
+const usage = `Very simple Ed25519 client and server certificate creation utility.
 
 Initialize a certificate authority:
   %s -init [-cacert=file -cakey=file] [not-after]
 
-Generate a client certificate:
+Generate a certificate:
   %s [-commonname] cert-file key-file name usage [not-after]
 
 Do both at the same time:
@@ -37,7 +37,8 @@ Do both at the same time:
 
 Usage is "client" or "server".
 
-The not-after date is specified in YYYY-MM-DD format.
+The not-after date is specified in YYYY-MM-DD format.  It defaults to about 14
+years into the future.
 
 Flags:
 `
@@ -250,13 +251,13 @@ func createCert(certFile, keyFile, name, caCertFile, caKeyFile string, common bo
 		return err
 	}
 
-	log.Printf("Client certificate written to file %s", certFile)
+	log.Printf("Certificate written to file %s", certFile)
 
 	if err := writePEM(keyFile, "PRIVATE KEY", keyData, 0600); err != nil {
 		return err
 	}
 
-	log.Printf("Client private key written to file %s", keyFile)
+	log.Printf("Private key written to file %s", keyFile)
 
 	return nil
 }

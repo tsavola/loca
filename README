@@ -1,5 +1,0 @@
-Installation:
-
-- Install Go compiler
-- go install github.com/tsavola/loca@latest
-
