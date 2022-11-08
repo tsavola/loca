@@ -37,8 +37,7 @@ Do both at the same time:
 
 Usage is "client" or "server".
 
-The not-after date is specified in YYYY-MM-DD format.  It defaults to about 14
-years into the future.
+The not-after date is specified in YYYY-MM-DD format.  It defaults to about 14 years into the future.
 
 Flags:
 `
